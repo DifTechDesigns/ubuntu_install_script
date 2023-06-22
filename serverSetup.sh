@@ -14,6 +14,28 @@ function validate_ip() {
     fi
 }
 
+#Update ENV Function
+function update_env() {
+    local env_file=$1
+    local key=$2
+    local value=$3
+
+    # Check if the file exists, if not create it
+    if [ ! -f "$env_file" ]; then
+        touch "$env_file"
+    fi
+
+    # Check if the key exists in the file
+    if grep -q "^$key=" "$env_file"; then
+        # If the key exists, replace it
+        sed -i "s/^$key=.*/$key=$value/" "$env_file"
+    else
+        # If the key does not exist, append it
+        echo "$key=$value" >> "$env_file"
+    fi
+}
+
+
 #Begin setup prompts
 echo "This script will install nginx and give you the choice of installing MySQL or Postgres."
 echo "It will also set up an nginx virtual host as well as certbot."
@@ -39,7 +61,7 @@ read -p "Do you want to add a new sudo user? (y/n): " add_sudo_user
 
 if [[ $add_sudo_user == "Y" || $add_sudo_user == "y" ]]; then
     #Prompt for the new username
-    read -p "Enter the new username: " username
+    read -p -r "Enter the new username: " username
 
     #Create the new user
     sudo useradd -m $username
@@ -99,7 +121,7 @@ sudo apt-get install -y certbot
 fi
 
 #Prompt for a domain name
-read -p "Enter a domain name: " domain_name
+read -p -r "Enter a domain name: " domain_name
 
 #Create a directory for the domain
 if ! [ -d /var/www/$domain_name/public ]; then
@@ -112,8 +134,10 @@ if [ ! -f /var/www/$domain_name/.env ]; then
   touch /var/www/$domain_name/.env
 else
   # The .env file already exists
-  echo "The .env file already exists."
+  echo "Skipping - The .env file already exists."
 fi
+
+env_file="/var/www/$domain_name/.env"
 
 #Create sites-enabled and sites-available files
 if ! [ -f /etc/nginx/sites-available/$domain_name ]; then
@@ -155,9 +179,9 @@ sudo apt-get update
 sudo apt-get install -y postgresql-15
 
 #Create a PostgreSQL user
-read -p "Enter a PostgreSQL username: " postgres_username
-read -s -p "Enter a PostgreSQL password: " postgres_password
-read -s -p "Confirm PostgreSQL password: " postgres_password_confirmation
+read -p -r "Enter a PostgreSQL username: " postgres_username
+read -s -p -r "Enter a PostgreSQL password: " postgres_password
+read -s -p -r "Confirm PostgreSQL password: " postgres_password_confirmation
 
 if [[ $postgres_password != $postgres_password_confirmation ]]; then
   echo "Passwords do not match. Please try again."
@@ -168,18 +192,20 @@ sudo -u postgres createuser $postgres_username
 sudo -u postgres psql -c "ALTER USER $postgres_username WITH PASSWORD '$postgres_password';"
 
 #Create a PostgreSQL database
-read -p "Enter a PostgreSQL database name: " postgres_database
+read -p -r "Enter a PostgreSQL database name: " postgres_database
 sudo -u postgres createdb $postgres_database
 
 #Ask the user if they want to open the Postgres port
 read -p "Would you like to open the Postgres port and restrict it to a specific IP address? (y/N)\n
 In the Postgres config, it will be open to all IP's but in the firewall it will be open only to the specified outside IP/n
-and of cousre to the localhost. " open_postgres_port
+and of course to the localhost. " open_postgres_port
+
+open_postgres_port=$(echo "$open_postgres_port" | tr '[:upper:]' '[:lower:]')
 
 if [ "$open_postgres_port" = "y" ]; then
 	# Get the user's IP address
 while true; do
-    read -p "Enter your IP address: " user_ip
+    read -p -r "Enter your IP address: " user_ip
     validate_ip $user_ip
 
     if [ $? -eq 0 ]; then
@@ -190,9 +216,9 @@ while true; do
 done
 
 # Add credentials to the .env file
-echo "DB_NAME=$postgres_database" >> /var/www/$domain_name/.env
-echo "DB_USER=$postgres_username" >> /var/www/$domain_name/.env
-echo "DB_PASS=$postgres_password" >> /var/www/$domain_name/.env
+update_env "$env_file" "DB_NAME" "$postgres_database"
+update_env "$env_file" "DB_USER" "$postgres_username"
+update_env "$env_file" "DB_PASS" "$postgres_password"
 
 
 # Open the Postgres port
@@ -203,7 +229,8 @@ sudo ufw allow from $user_ip to any port 5432
 
 # Update the PostgreSQL configuration files
 sudo sed -i "s/host all all 0.0.0.0/host all all/g" /etc/postgresql/15/main/pg_hba.conf
-sudo sed -i "s/listen_addresses = ''/listen_addresses = ''/g" /etc/postgresql/15/main/postgresql.conf
+sudo sed -i '/listen_addresses/c\listen_addresses = '\''*'\''' /etc/postgresql/15/main/postgresql.conf
+
 fi
 
 fi
@@ -215,7 +242,10 @@ sudo apt-get install -y mysql-server
 echo "Running the MySQL Secure Install"
 sudo mysql_secure_installation
 
-#Check if the user wants to open the MySQL port and restrict it to a specific IP address? (y/N) " open_mysql_port
+#Check if the user wants to open the MySQL port
+read -p -r "Do you want to open the MySQL port and restrict it to a specific IP address? (Y/N)" open_mysql_port
+
+open_mysql_port=$(echo "$open_postgres_port" | tr '[:upper:]' '[:lower:]')
 if [ "$open_mysql_port" = "y" ]; then
 	# Get the user's IP address
 read -p "Enter your IP address: " user_ip
@@ -227,24 +257,28 @@ sudo ufw allow 3306/tcp
 sudo ufw allow from $user_ip to any port 3306
 
 # Create a MySQL user
-read -p "Enter a MySQL username: " mysql_username
-read -p "Enter a MySQL password: " mysql_password
+read -p -r "Enter a MySQL username: " mysql_username
+read -s -p -r "Enter a MySQL password: " mysql_password
+echo
+read -p -r "Enter a MySQL database name: " mysql_database
+
 sudo mysql -u root -p << EOF
-CREATE USER '$mysql_username'@'' IDENTIFIED BY '$mysql_password';
-GRANT ALL PRIVILEGES ON . TO '$mysql_username'@'';
+CREATE USER '$mysql_username'@'localhost' IDENTIFIED BY '$mysql_password';
+CREATE DATABASE IF NOT EXISTS $mysql_database;
+GRANT ALL PRIVILEGES ON $mysql_database.* TO '$mysql_username'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
 # Add credentials to the .env file
-echo "DB_NAME=$mysql_database" >> /var/www/$domain_name/.env
-echo "DB_USER=$mysql_username" >> /var/www/$domain_name/.env
-echo "DB_PASS=$mysql_password" >> /var/www/$domain_name/.env
+update_env "$env_file" "DB_NAME" "$mysql_database"
+update_env "$env_file" "DB_USER" "$mysql_username"
+update_env "$env_file" "DB_PASS" "$mysql_password"
 
 fi
 fi
 
 echo "Do you want to install Postfix? (Y/N): "
-read -n1 -p "" response
+read -n1 -p  -r"" response
 
 if [[ $response = "Y" || $response = "y" ]]; then
   echo "Installing Postfix..."
@@ -254,6 +288,7 @@ else
 fi
 
 #Delete the bash history of this session for security reasons.
+echo "Deleting bash history for this session for security reasons"
 history -c
 
 echo "Installation complete! Your domain name is $domain_name."
