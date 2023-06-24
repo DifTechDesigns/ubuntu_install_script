@@ -291,5 +291,53 @@ fi
 echo "Deleting bash history for this session for security reasons"
 history -c
 
+#Install vim plugin ability
+echo "vim can now use plugins, but we're not installing any."
+if [ ! -f ~/.vim/autoload/plug.vim ]; then
+    curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+fi
+
+#Adds line numbers to vim.
+echo "Adding various options to vim. See ~/.vimrc for details."
+if ! grep -q "set number" ~/.vimrc; then
+  echo "set number" >> ~/.vimrc
+fi
+if ! grep -q "syntax on" ~/.vimrc; then
+  echo "syntax on" >> ~/.vimrc
+fi
+if ! grep -q "set mouse=a" ~/.vimrc; then
+  echo "set mouse=a" >> ~/.vimrc
+fi
+if ! grep -q "set showmatch" ~/.vimrc; then
+  echo "set showmatch" >> ~/.vimrc
+fi
+if ! grep -q "set cursorline" ~/.vimrc; then
+  echo "set set cursorline" >> ~/.vimrc
+fi
+if ! grep -q "autocmd BufReadPost \* if line(\"'\\\"\") >= 1 && line(\"'\\\"\") <= line(\"\$\") | exe \"normal! g'\\\"\" | endif" ~/.vimrc; then
+  echo "autocmd BufReadPost * if line(\"'\\\"\") >= 1 && line(\"'\\\"\") <= line(\"\$\") | exe \"normal! g'\\\"\" | endif" >> ~/.vimrc
+fi
+if ! grep -q "set linebreak" ~/.vimrc; then
+  echo "set linebreak" >> ~/.vimrc
+fi
+if ! grep -q "set title" ~/.vimrc; then
+  echo "set title" >> ~/.vimrc
+fi
+if ! grep -q "set scrolloff=1" ~/.vimrc; then
+  echo "set scrolloff=1" >> ~/.vimrc
+fi
+if ! grep -q "set sidescrolloff=1" ~/.vimrc; then
+  echo "set sidescrolloff=1" >> ~/.vimrc
+fi
+if ! grep -q "set noswapfile" ~/.vimrc; then
+  echo "set noswapfile" >> ~/.vimrc
+fi
+if ! grep -q "filetype on" ~/.vimrc; then
+  echo "filetype on" >> ~/.vimrc
+fi
+if ! grep -q "filetype plugin on" ~/.vimrc; then
+  echo "filetype plugin on" >> ~/.vimrc
+fi
 echo "Installation complete! Your domain name is $domain_name."
 exit 0
