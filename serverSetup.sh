@@ -1,35 +1,4 @@
 #!/bin/bash
-# Function to ask for user confirmation
-function ask() {
-    local prompt default reply
-
-    if [[ "${2:-}" = "Y" ]]; then
-        prompt="Y/n"
-        default=Y
-    elif [[ "${2:-}" = "N" ]]; then
-        prompt="y/N"
-        default=N
-    else
-        prompt="y/n"
-        default=
-    fi
-
-    echo -e "$1 [$prompt] "
-    read reply
-
-    if [[ -z "$reply" ]]; then
-        reply=$default
-    fi
-
-    reply=$(echo "$reply" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$reply" = 'y' ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 
 # Function to ask for user confirmation
 function ask() {
@@ -100,7 +69,6 @@ function update_env() {
         echo -e "$key=$value" >> "$env_file"
     fi
 }
-
 
 #Begin setup prompts
 echo -e "This script will install nginx and give you the choice of installing MySQL or Postgres."
@@ -359,8 +327,11 @@ sudo ufw allow 5432/tcp
 sudo ufw allow from $user_ip to any port 5432
 
 # Update the PostgreSQL configuration files
-sudo sed -i "s/host all all 0.0.0.0/host all all/g" /etc/postgresql/15/main/pg_hba.conf
+sudo sed -i "s/host all all 127.0.0.1\/32 scram-sha-256/host all all 0.0.0.0\/0 scram-sha-256/g" /etc/postgresql/15/main/pg_hba.conf
 sudo sed -i '/listen_addresses/c\listen_addresses = '\''*'\''' /etc/postgresql/15/main/postgresql.conf
+
+# Restart PostgreSQL
+sudo service postgresql restart
 
 fi
 
