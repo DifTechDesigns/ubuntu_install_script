@@ -321,7 +321,7 @@ update_env "$env_file" "DB_PASS" "$postgres_password"
 
 
 # Open the Postgres port
-sudo ufw allow 5432/tcp
+sudo ufw deny 5432/tcp
 
 # Add the user's IP address to the Postgres firewall rules
 sudo ufw allow from $user_ip to any port 5432
@@ -352,7 +352,7 @@ if $open_mysql_port; then
 read -p "Enter your IP address: " user_ip
 
 # Open the MySQL port
-sudo ufw allow 3306/tcp
+sudo ufw deny 3306/tcp
 
 # Add the user's IP address to the MySQL firewall rules
 sudo ufw allow from $user_ip to any port 3306
